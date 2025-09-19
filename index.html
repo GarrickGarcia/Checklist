@@ -9,11 +9,11 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
 
-  <!-- Babel to compile inline JSX -->
+  <!-- Babel for inline JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <!-- Papa Parse (no integrity attr to avoid SRI mismatch) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
+  <!-- Papa Parse (no SRI) -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
 
   <style>
     html, body { margin: 0; background: #F0EEE6; }
@@ -355,11 +355,7 @@
     };
 
     // Render
-    if (!window.React || !window.ReactDOM) {
-      document.getElementById('root').innerHTML = '<pre>Failed to load React from CDN.</pre>';
-    } else {
-      ReactDOM.createRoot(document.getElementById('root')).render(<ClaudeFeatureTracker />);
-    }
+    ReactDOM.createRoot(document.getElementById('root')).render(<ClaudeFeatureTracker />);
   </script>
 </body>
 </html>
