@@ -5,14 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Claude Feature Tracker</title>
 
-  <!-- React 18 + ReactDOM 18 (UMD) -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-
-  <!-- Babel for inline JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-  <!-- Papa Parse (no SRI) -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
 
   <style>
@@ -70,9 +65,9 @@
       const loadFromSheet = async () => {
         setIsLoading(true);
         try {
-          const url = `${CSV_URL}&t=${Date.now()}`;
-          const text = await fetch(url, { cache: "no-store" }).then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+          const url = CSV_URL + "&t=" + Date.now();
+          const text = await fetch(url, { cache: "no-store" }).then(function (r) {
+            if (!r.ok) throw new Error("HTTP " + r.status + " " + r.statusText);
             return r.text();
           });
           const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
@@ -84,14 +79,16 @@
             return;
           }
 
-          const latestTs = rows.reduce((max, row) => row.batch_ts > max ? row.batch_ts : max, "");
-          const latest = rows.filter(row => row.batch_ts === latestTs);
+          // latest batch_ts (string compare is fine for ISO timestamps)
+          let latestTs = "";
+          rows.forEach(function(row){ if (row.batch_ts > latestTs) latestTs = row.batch_ts; });
+          const latest = rows.filter(function(row){ return row.batch_ts === latestTs; });
 
           const newState = initializeState();
-          latest.forEach(row => {
+          latest.forEach(function(row){
             const featureName = row.Feature;
             if (!featureName) return;
-            teamMembers.forEach(member => {
+            teamMembers.forEach(function(member){
               const val = (row[member] || "").trim();
               newState[member][featureName] = /^done$/i.test(val);
             });
@@ -100,7 +97,7 @@
           setCompletionStatus(newState);
           setLoadedBatchTs(latestTs);
         } catch (err) {
-          console.error('CSV load failed:', err);
+          console.error("CSV load failed:", err);
         } finally {
           setIsLoading(false);
         }
@@ -110,25 +107,26 @@
         setIsSaving(true);
         const batch_ts = new Date().toISOString();
 
-        const rows = features.map(feature => {
-          const row = { batch_ts, Feature: feature.name };
-          teamMembers.forEach(member => {
+        const rows = features.map(function(feature){
+          const row = { batch_ts: batch_ts, Feature: feature.name };
+          teamMembers.forEach(function(member){
             row[member] = completionStatus[member][feature.name] ? "Done" : "Not Done";
           });
           return row;
         });
 
-        const postRow = async (row, attempt = 0) => {
+        const postRow = async function(row, attempt){
+          attempt = attempt || 0;
           try {
             const res = await fetch(WEBHOOK, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(row),
+              body: JSON.stringify(row)
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) throw new Error("HTTP " + res.status);
           } catch (e) {
             if (attempt < 2) {
-              await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
+              await new Promise(function(resolve){ setTimeout(resolve, 500 * (attempt + 1)); });
               return postRow(row, attempt + 1);
             }
             throw e;
@@ -142,15 +140,15 @@
           }
           setLastSaved(new Date());
         } catch (e) {
-          console.error('Save failed:', e);
+          console.error("Save failed:", e);
         } finally {
           setIsSaving(false);
         }
       };
 
-      useEffect(() => { loadFromSheet(); }, []);
+      useEffect(function(){ loadFromSheet(); }, []);
 
-      const toggleCompletion = (member, feature, subFeature = null) => {
+      const toggleCompletion = (member, feature, subFeature) => {
         setCompletionStatus(prev => ({
           ...prev,
           [member]: {
@@ -275,7 +273,7 @@
                   )}
                   {loadedBatchTs && (
                     <span style={{ fontSize: '11px', opacity: 0.5 }}>
-                      Data from: {new Date(loadedBatchTs).toLocaleString()}
+                      Data from: {loadedBatchTs ? new Date(loadedBatchTs).toLocaleString() : "" }
                     </span>
                   )}
                 </div>
@@ -354,7 +352,6 @@
       );
     };
 
-    // Render
     ReactDOM.createRoot(document.getElementById('root')).render(<ClaudeFeatureTracker />);
   </script>
 </body>
