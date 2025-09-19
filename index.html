@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>Claude Feature Tracker</title>
-  <!-- React 18 + ReactDOM 18 -->
+
+  <!-- React 18 + ReactDOM 18 (UMD) -->
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
-  <!-- Babel for JSX (no build needed) -->
+
+  <!-- Babel to compile inline JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <!-- Papa Parse for robust CSV parsing -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" integrity="sha512-eG6X8I7eA3kK3Y9tL0f3cV3sN8WJ3h9NDn5qU3gT5kGQnU+Rr6j0sQGkZl7qI4jY7bWq+Hlf9f9r0p1xQkJpGg==" crossorigin="anonymous"></script>
+
+  <!-- Papa Parse (no integrity attr to avoid SRI mismatch) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js" crossorigin="anonymous"></script>
+
   <style>
-    /* (optional) subtle body reset to match your inline styles nicely */
     html, body { margin: 0; background: #F0EEE6; }
     button { font-family: system-ui, -apple-system, sans-serif; }
   </style>
@@ -28,7 +28,6 @@
 
     const ClaudeFeatureTracker = () => {
       const teamMembers = ['Garrick', 'Kelly', 'Clay', 'Justin', 'Joe'];
-
       const features = [
         { name: 'Model Picker',          subFeatures: [] },
         { name: 'Extended Thinking',     subFeatures: [] },
@@ -41,11 +40,9 @@
         { name: 'MCP',                   subFeatures: [] }
       ];
 
-      // Endpoints you already set up
       const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQZQyaCne0_O69riTMC5pFDypMv-ivMZ_ZGSY4pbui9T-8kZZF-LdamW70yfhU-nvYu68r4KC2Gfuvc/pub?gid=0&single=true&output=csv";
       const WEBHOOK = "https://hook.us1.make.com/usjpboqndhxk3iopws1q9vew14gudfcy";
 
-      // Initialize completion state (same shape you had)
       const initializeState = () => {
         const state = {};
         teamMembers.forEach(member => {
@@ -70,21 +67,16 @@
       const [lastSaved, setLastSaved] = useState(null);
       const [loadedBatchTs, setLoadedBatchTs] = useState(null);
 
-      // Load latest snapshot from the published Sheet CSV
       const loadFromSheet = async () => {
         setIsLoading(true);
-        console.log('Loading from Google Sheets CSV...');
         try {
-          // cache-bust to avoid stale CSV
           const url = `${CSV_URL}&t=${Date.now()}`;
           const text = await fetch(url, { cache: "no-store" }).then(r => {
-            if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+            if (!r.ok) throw new Error(\`HTTP \${r.status} \${r.statusText}\`);
             return r.text();
           });
-
           const parsed = Papa.parse(text, { header: true, skipEmptyLines: true });
           const rows = parsed.data || [];
-          console.log('Parsed rows:', rows.length);
 
           if (!rows.length) {
             setCompletionStatus(initializeState());
@@ -92,7 +84,6 @@
             return;
           }
 
-          // Find latest batch_ts
           const latestTs = rows.reduce((max, row) => row.batch_ts > max ? row.batch_ts : max, "");
           const latest = rows.filter(row => row.batch_ts === latestTs);
 
@@ -108,7 +99,6 @@
 
           setCompletionStatus(newState);
           setLoadedBatchTs(latestTs);
-          console.log('Loaded batch:', latestTs);
         } catch (err) {
           console.error('CSV load failed:', err);
         } finally {
@@ -116,12 +106,10 @@
         }
       };
 
-      // Save current snapshot via Make (append-only, one POST per row)
       const saveSnapshot = async () => {
         setIsSaving(true);
         const batch_ts = new Date().toISOString();
 
-        // Build rows from current state
         const rows = features.map(feature => {
           const row = { batch_ts, Feature: feature.name };
           teamMembers.forEach(member => {
@@ -130,7 +118,6 @@
           return row;
         });
 
-        // Small concurrency for speed without hammering
         const postRow = async (row, attempt = 0) => {
           try {
             const res = await fetch(WEBHOOK, {
@@ -138,7 +125,7 @@
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify(row),
             });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            if (!res.ok) throw new Error(\`HTTP \${res.status}\`);
           } catch (e) {
             if (attempt < 2) {
               await new Promise(r => setTimeout(r, 500 * (attempt + 1)));
@@ -154,7 +141,6 @@
             await Promise.all(rows.slice(i, i + chunk).map(postRow));
           }
           setLastSaved(new Date());
-          console.log('All rows saved.');
         } catch (e) {
           console.error('Save failed:', e);
         } finally {
@@ -162,7 +148,6 @@
         }
       };
 
-      // On mount, load latest from the Sheet
       useEffect(() => { loadFromSheet(); }, []);
 
       const toggleCompletion = (member, feature, subFeature = null) => {
@@ -171,10 +156,7 @@
           [member]: {
             ...prev[member],
             [feature]: subFeature
-              ? {
-                  ...prev[member][feature],
-                  [subFeature]: !prev[member][feature][subFeature]
-                }
+              ? { ...prev[member][feature], [subFeature]: !prev[member][feature][subFeature] }
               : !prev[member][feature]
           }
         }));
@@ -211,15 +193,11 @@
           fontFamily: 'system-ui, -apple-system, sans-serif',
           position: 'relative'
         }}>
-          {/* Loading Overlay */}
           {isLoading && (
             <div style={{
-              position: 'fixed',
-              top: 0, left: 0, right: 0, bottom: 0,
+              position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
               backgroundColor: 'rgba(240, 238, 230, 0.9)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
               zIndex: 1000
             }}>
               <div style={{
@@ -239,43 +217,20 @@
           )}
 
           <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
-            {/* Header */}
             <div style={{ marginBottom: '32px', textAlign: 'center' }}>
-              <h1 style={{
-                fontSize: '28px',
-                fontWeight: '600',
-                margin: '0 0 8px 0',
-                color: '#141413'
-              }}>
+              <h1 style={{ fontSize: '28px', fontWeight: '600', margin: '0 0 8px 0', color: '#141413' }}>
                 Claude Feature Tracker
               </h1>
-              <p style={{
-                fontSize: '16px',
-                margin: '0 0 16px 0',
-                opacity: 0.7
-              }}>
+              <p style={{ fontSize: '16px', margin: '0 0 16px 0', opacity: 0.7 }}>
                 Track your team's progress testing Claude ecosystem features
               </p>
-              <div style={{
-                backgroundColor: '#E3DACC',
-                padding: '12px 24px',
-                borderRadius: '8px',
-                display: 'inline-block'
-              }}>
+              <div style={{ backgroundColor: '#E3DACC', padding: '12px 24px', borderRadius: '8px', display: 'inline-block' }}>
                 <span style={{ fontSize: '16px', fontWeight: '500' }}>
                   Progress: {completed}/{total} ({progressPercentage}%)
                 </span>
               </div>
 
-              {/* Save and Status Controls */}
-              <div style={{
-                marginTop: '16px',
-                display: 'flex',
-                gap: '12px',
-                justifyContent: 'center',
-                alignItems: 'center',
-                flexWrap: 'wrap'
-              }}>
+              <div style={{ marginTop: '16px', display: 'flex', gap: '12px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
                   onClick={saveSnapshot}
                   disabled={isSaving}
@@ -327,13 +282,7 @@
               </div>
             </div>
 
-            {/* Main Table */}
-            <div style={{
-              backgroundColor: '#E3DACC',
-              borderRadius: '12px',
-              padding: '24px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-            }}>
+            <div style={{ backgroundColor: '#E3DACC', borderRadius: '12px', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
@@ -343,7 +292,7 @@
                         textAlign: 'left',
                         fontWeight: '600',
                         fontSize: '14px',
-                        borderBottom: '2px solid '#CEC6B9',
+                        borderBottom: '2px solid #CEC6B9',
                         backgroundColor: '#CEC6B9'
                       }}>
                         Feature
@@ -365,116 +314,39 @@
                   </thead>
                   <tbody>
                     {features.map(feature => (
-                      <React.Fragment key={feature.name}>
-                        {/* Main feature row */}
-                        {feature.subFeatures.length === 0 && (
-                          <tr>
-                            <td style={{
-                              padding: '12px',
-                              fontWeight: '500',
-                              borderBottom: '1px solid #CEC6B9'
-                            }}>
-                              {feature.name}
-                            </td>
-                            {teamMembers.map(member => (
-                              <td key={member} style={{
-                                padding: '12px',
-                                textAlign: 'center',
-                                borderBottom: '1px solid #CEC6B9'
-                              }}>
-                                <button
-                                  onClick={() => toggleCompletion(member, feature.name)}
-                                  style={{
-                                    backgroundColor: completionStatus[member][feature.name] ? '#D97757' : '#CEC6B9',
-                                    color: completionStatus[member][feature.name] ? 'white' : '#141413',
-                                    border: 'none',
-                                    borderRadius: '6px',
-                                    padding: '8px 16px',
-                                    fontSize: '12px',
-                                    fontWeight: '500',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s ease',
-                                    minWidth: '80px'
-                                  }}
-                                >
-                                  {completionStatus[member][feature.name] ? 'Done' : 'Not Done'}
-                                </button>
-                              </td>
-                            ))}
-                          </tr>
-                        )}
-                        {/* If you add subfeatures later, this block remains compatible */}
-                        {feature.subFeatures.length > 0 && (
-                          <>
-                            <tr>
-                              <td style={{
-                                padding: '12px',
-                                fontWeight: '600',
-                                fontSize: '15px',
-                                borderBottom: '1px solid #CEC6B9'
-                              }}>
-                                {feature.name}
-                              </td>
-                              {teamMembers.map(member => (
-                                <td key={member} style={{
-                                  padding: '12px',
-                                  borderBottom: '1px solid #CEC6B9'
-                                }}></td>
-                              ))}
-                            </tr>
-                            {feature.subFeatures.map(subFeature => (
-                              <tr key={subFeature}>
-                                <td style={{
-                                  padding: '12px 24px',
-                                  fontSize: '14px',
-                                  borderBottom: '1px solid #CEC6B9',
-                                  fontStyle: 'italic'
-                                }}>
-                                  • {subFeature}
-                                </td>
-                                {teamMembers.map(member => (
-                                  <td key={member} style={{
-                                    padding: '12px',
-                                    textAlign: 'center',
-                                    borderBottom: '1px solid #CEC6B9'
-                                  }}>
-                                    <button
-                                      onClick={() => toggleCompletion(member, feature.name, subFeature)}
-                                      style={{
-                                        backgroundColor: completionStatus[member][feature.name][subFeature] ? '#D97757' : '#CEC6B9',
-                                        color: completionStatus[member][feature.name][subFeature] ? 'white' : '#141413',
-                                        border: 'none',
-                                        borderRadius: '6px',
-                                        padding: '8px 16px',
-                                        fontSize: '12px',
-                                        fontWeight: '500',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        minWidth: '80px'
-                                      }}
-                                    >
-                                      {completionStatus[member][feature.name][subFeature] ? 'Done' : 'Not Done'}
-                                    </button>
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </>
-                        )}
-                      </React.Fragment>
+                      <tr key={feature.name}>
+                        <td style={{ padding: '12px', fontWeight: '500', borderBottom: '1px solid #CEC6B9' }}>
+                          {feature.name}
+                        </td>
+                        {teamMembers.map(member => (
+                          <td key={member} style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #CEC6B9' }}>
+                            <button
+                              onClick={() => toggleCompletion(member, feature.name)}
+                              style={{
+                                backgroundColor: completionStatus[member][feature.name] ? '#D97757' : '#CEC6B9',
+                                color: completionStatus[member][feature.name] ? 'white' : '#141413',
+                                border: 'none',
+                                borderRadius: '6px',
+                                padding: '8px 16px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s ease',
+                                minWidth: '80px'
+                              }}
+                            >
+                              {completionStatus[member][feature.name] ? 'Done' : 'Not Done'}
+                            </button>
+                          </td>
+                        ))}
+                      </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Footer Note */}
-            <div style={{
-              marginTop: '24px',
-              textAlign: 'center',
-              fontSize: '14px',
-              opacity: 0.6
-            }}>
+            <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '14px', opacity: 0.6 }}>
               Data is synchronized with Google Sheets (read) and Make (write). Use "Save Changes" to persist your updates.
             </div>
           </div>
@@ -482,7 +354,12 @@
       );
     };
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<ClaudeFeatureTracker />);
+    // Render
+    if (!window.React || !window.ReactDOM) {
+      document.getElementById('root').innerHTML = '<pre>Failed to load React from CDN.</pre>';
+    } else {
+      ReactDOM.createRoot(document.getElementById('root')).render(<ClaudeFeatureTracker />);
+    }
   </script>
 </body>
 </html>
